@@ -1,7 +1,9 @@
-﻿using BepInEx.Configuration;
+﻿using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -131,11 +133,30 @@ namespace BepInPluginSample
             // 하모니 패치
             try // 가급적 try 처리 해주기. 하모니 패치중에 오류나면 다른 플러그인까지 영향 미침
             {
-                harmony = Harmony.CreateAndPatchAll(typeof(Sample));
+                harmony = Harmony.CreateAndPatchAll(typeof(Warriors_Of_The_Nile_2));
+                //StartCoroutine(coroutine(1));
             }
             catch (Exception e)
             {
                 logger.LogError(e);
+            }
+        }
+
+        //딜레이를 할 함수를 만들어 줍니다. 반환값을 IEnumerator 로 해주어야 합니다.
+        private IEnumerator coroutine(float waitTime)
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(waitTime); //waitTime 만큼 딜레이후 다음 코드가 실행된다.
+                CurBattleMap = (BattleMap)typeof(BattleManager).GetField("CurBattleMap").GetValue(Singleton<BattleManager>.Instance);
+                if (CurBattleMap)
+                {
+                    factionPawnMap = (Dictionary<FactionType, List<Pawn>>)typeof(BattleMap).GetField("factionPawnMap").GetValue(CurBattleMap);
+                }
+                if (factionPawnMap.ContainsKey(FactionType.Hero))
+                    pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
+                logger.LogWarning($"coroutine ; {pawns.Count}");
+                //While문을 빠져 나가지 못하여 waitTime마다 Shot함수를 반복실행 됩니다.
             }
         }
 
@@ -208,10 +229,12 @@ namespace BepInPluginSample
                 if (GUILayout.Button($"SilverCoin +10000")) { InventoryManager.AddCurrency(CurrencyType.SilverCoin, 10000);  }
                 if (GUILayout.Button($"PharaohCoin +100")) { InventoryManager.AddCurrency(CurrencyType.PharaohCoin, 100);  }
 
+                GUILayout.Label($"pawns ; {pawns.Count}");
                 foreach (var item in pawns)
                 {
                     GUILayout.Label($"{item.name}");
                 }
+                GUILayout.Label($"---");
                 // GUILayout.BeginHorizontal();
                 // GUILayout.Label($"ammoMulti {ammoMulti.Value}");
                 // if (GUILayout.Button("+", GUILayout.Width(20), GUILayout.Height(20))) { ammoMulti.Value += 1; }
@@ -247,33 +270,64 @@ namespace BepInPluginSample
         [HarmonyPostfix]
         public static void BattleMap_ctor(BattleMap __instance, Dictionary<FactionType, List<Pawn>> ___factionPawnMap)
         {
-            logger.LogWarning($"BattleMap_ctor ; {___factionPawnMap.Count}");
             factionPawnMap = ___factionPawnMap;
             pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
+            logger.LogWarning($"BattleMap_ctor ; {___factionPawnMap.Count} ; {pawns.Count} ");
             //BattleManager.GetCurrentBattleMap().GetPawnsByFaction(FactionType.Hero,ref pawns);
         }
-        
+
         [HarmonyPatch(typeof(BattleMap), "GenManagerPawn")]
         [HarmonyPostfix]
         public static void GenManagerPawn(BattleMap __instance, TmxMap tmx, Dictionary<FactionType, List<Pawn>> ___factionPawnMap)
         {
             logger.LogWarning($"GenManagerPawn ; {___factionPawnMap.Count}");
+        /*
             factionPawnMap = ___factionPawnMap;
             pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
             //BattleManager.GetCurrentBattleMap().GetPawnsByFaction(FactionType.Hero,ref pawns);
+        */
         }
-
+        
+        [HarmonyPatch(typeof(BattleMap), "LoadMap", typeof(string), typeof(bool))]
+        [HarmonyPostfix]
+        public static void LoadMap(BattleMap __instance, string mapName, bool withPawn , Dictionary<FactionType, List<Pawn>> ___factionPawnMap)
+        {
+            logger.LogWarning($"GenManagerPawn ; {___factionPawnMap.Count}");
+            factionPawnMap = ___factionPawnMap;
+            pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
+            //BattleManager.GetCurrentBattleMap().GetPawnsByFaction(FactionType.Hero,ref pawns);
+        /*
+        */
+        }
 
         [HarmonyPatch(typeof(BattleManager), "SetCurrentBattleMap")]
         [HarmonyPostfix]
         public static void SetCurrentBattleMap(BattleManager __instance, BattleMap map)
         {
             
+            logger.LogWarning($"SetCurrentBattleMap ; {map.GetPawnCountOfFaction(FactionType.Hero)}");
+        /*
             CurBattleMap = map;
             factionPawnMap=(Dictionary < FactionType, List < Pawn >> )typeof(BattleMap).GetField("factionPawnMap").GetValue(map);
             pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
-            logger.LogWarning($"SetCurrentBattleMap ; {pawns.Count}");
             //BattleManager.GetCurrentBattleMap().GetPawnsByFaction(FactionType.Hero,ref pawns);
+        */
+        }
+
+        // public static void CheckDeadPawn(Pawn attacker, Pawn mainTarget = null, bool isGenDeadEvent = true, bool onlyGenIfNotExistInEventStack = false)
+        [HarmonyPatch(typeof(BattleManager), "CheckDeadPawn", typeof(Pawn), typeof(Pawn), typeof(bool), typeof(bool))]
+        [HarmonyPrefix]
+        public static void CheckDeadPawn(Pawn attacker, Pawn mainTarget, bool isGenDeadEvent, bool onlyGenIfNotExistInEventStack)
+        {
+            if (!noDeadConfirm.Value)
+            {
+                return;
+            }
+            logger.LogWarning($"CheckDeadPawn ; {attacker.name} ; {mainTarget?.name} ;{mainTarget?.Stat.HP} ; {isGenDeadEvent} ; {onlyGenIfNotExistInEventStack} ");
+            if (mainTarget?.Faction == FactionType.Hero)
+            {
+                mainTarget.Stat.FillMaxHP();
+            }
         }
 
         [HarmonyPatch(typeof(InventoryManager), "AddCurrency", typeof(CurrencyType), typeof(int), typeof(bool))]
@@ -282,7 +336,7 @@ namespace BepInPluginSample
         {
             logger.LogWarning($"AddCurrency ; {type} ; {count}");
         }
-
+        /*
         //public static bool IsCurrencyEnough(CurrencyType type, int price)
         //[HarmonyPatch(typeof(InventoryManager), nameof(InventoryManager.IsCurrencyEnough),typeof(CurrencyType),typeof(int))]//, MethodType.StaticConstructor
         [HarmonyPatch(typeof(InventoryManager), "IsCurrencyEnough", typeof(CurrencyType),typeof(int))]//, MethodType.StaticConstructor
@@ -308,6 +362,20 @@ namespace BepInPluginSample
             }
 
         }
+        */
+        /*
+        [HarmonyPatch(typeof(Pawn), MethodType.Constructor)]
+        [HarmonyPrefix]
+        public static void PawnC(Pawn __instance)
+        {
+            logger.LogWarning($"PawnC ;{__instance.name} ; {__instance.Faction}");
+            if (__instance.Faction == FactionType.Hero)
+            {
+                pawns.Add(__instance);
+            }
+
+        }
+        */
 
         [HarmonyPatch(typeof(Pawn), "DeadConfirm", typeof(bool))]
         [HarmonyPrefix]
@@ -324,7 +392,7 @@ namespace BepInPluginSample
             }            
         }
         
-        [HarmonyPatch(typeof(Pawn), "ReadFromTransitData", typeof(bool))]
+        [HarmonyPatch(typeof(Pawn), "ReadFromTransitData")]
         [HarmonyPrefix]
         public static void ReadFromTransitData(PawnTransitData data)
         {
@@ -340,26 +408,25 @@ namespace BepInPluginSample
             //}            
         }
 
-        [HarmonyPatch(typeof(Pawn), "CheckDeadPawn", typeof(Pawn), typeof(Pawn), typeof(bool), typeof(bool))]
-        [HarmonyPrefix]
-        public static void CheckDeadPawn(Pawn attacker, Pawn mainTarget , bool isGenDeadEvent , bool onlyGenIfNotExistInEventStack )
-        {
-            if (!noDeadConfirm.Value)
-            {
-                return;
-            }
-            logger.LogWarning($"CheckDeadPawn ; {attacker.name} ; {mainTarget.name} ;{mainTarget.Stat.HP} ; {isGenDeadEvent} ; {onlyGenIfNotExistInEventStack} ");
-            if (mainTarget.Faction==FactionType.Hero)
-            {
-                mainTarget.Stat.FillMaxHP();
-            }
 
-           
-            //if (__instance.Stat.HP <= 0 && __instance.Stat.MaxHP > 0 && GameConfig.IsPlayerControlledPawn(__instance) && !force)
-            //{
-            //    __instance.Stat.FillMaxHP();
-            //}            
+        
+        [HarmonyPatch(typeof(PlayerPawnInfoBoard), "Start")]
+        [HarmonyPrefix]
+        public static void PlayerPawnInfoBoardStart(PlayerPawnInfoBoard __instance)
+        {
+
+            logger.LogWarning($"PlayerPawnInfoBoardStart ;");
         }
+        
+        [HarmonyPatch(typeof(PlayerPawnInfoBoard), "setBaseStat")]
+        [HarmonyPrefix]
+        public static void setBaseStat(Pawn p, PawnBaseConfig config)
+        {
+
+            logger.LogWarning($"setBaseStat ;");
+        }
+        
+        //List<Pawn> pawns = new List<Pawn>();
 
         /*
         [HarmonyPatch(typeof(AEnemy), "DamageMult", MethodType.Setter)]
@@ -373,7 +440,7 @@ namespace BepInPluginSample
             __0 *= eDamageMult.Value;
         }
         */
-        // =========================================================
-        #endregion
+            // =========================================================
+            #endregion
     }
 }
