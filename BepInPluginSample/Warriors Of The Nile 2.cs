@@ -294,7 +294,11 @@ namespace BepInPluginSample
         {
             logger.LogWarning($"GenManagerPawn ; {___factionPawnMap.Count}");
             factionPawnMap = ___factionPawnMap;
-            pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
+            if (factionPawnMap.ContainsKey(FactionType.Hero))
+            {
+                pawns = factionPawnMap[FactionType.Hero] as List<Pawn>;
+
+            }
             //BattleManager.GetCurrentBattleMap().GetPawnsByFaction(FactionType.Hero,ref pawns);
         /*
         */
