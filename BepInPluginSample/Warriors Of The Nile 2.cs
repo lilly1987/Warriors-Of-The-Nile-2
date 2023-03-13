@@ -49,6 +49,7 @@ namespace BepInPluginSample
         // =========================================================
 
         private static ConfigEntry<bool> noDeadConfirm;
+        private static ConfigEntry<bool> noEnergy;
         private static ConfigEntry<bool> isCurrencyEnough;
         // private static ConfigEntry<float> uiW;
         // private static ConfigEntry<float> xpMulti;
@@ -98,6 +99,7 @@ namespace BepInPluginSample
 
             noDeadConfirm = Config.Bind("game", "noDeadConfirm", true);
             isCurrencyEnough = Config.Bind("game", "isCurrencyEnough", true);
+            noEnergy = Config.Bind("game", "noEnergy", true);
             // xpMulti = Config.Bind("game", "xpMulti", 2f);
 
             // =========================================================
@@ -225,6 +227,7 @@ namespace BepInPluginSample
                 // =========================================================
 
                 if (GUILayout.Button($"noDeadConfirm {noDeadConfirm.Value}")) { noDeadConfirm.Value = !noDeadConfirm.Value; }
+                if (GUILayout.Button($"noEnergy {noEnergy.Value}")) { noEnergy.Value = !noEnergy.Value; }
                 if (GUILayout.Button($"isCurrencyEnough {isCurrencyEnough.Value}")) { isCurrencyEnough.Value = !isCurrencyEnough.Value; }
                 if (GUILayout.Button($"SilverCoin +10000")) { InventoryManager.AddCurrency(CurrencyType.SilverCoin, 10000);  }
                 if (GUILayout.Button($"PharaohCoin +100")) { InventoryManager.AddCurrency(CurrencyType.PharaohCoin, 100);  }
@@ -381,6 +384,21 @@ namespace BepInPluginSample
         }
         */
 
+        [HarmonyPatch(typeof(Pawn), "CostPowerEnergy")]
+        [HarmonyPrefix]
+        public static void CostPowerEnergy(Pawn __instance)
+        {
+            if (!noEnergy.Value)
+            {
+                return;
+            }
+            logger.LogWarning($"CostPowerEnergy ; {GameConfig.IsPlayerControlledPawn(__instance)} ; {__instance.Stat.Energy} ; {__instance.Stat.MaxEnergy} ");
+            if (__instance.Stat.Energy < __instance.Stat.MaxEnergy && __instance.Faction==FactionType.Hero )
+            {
+                __instance.Stat.Energy = __instance.Stat.MaxEnergy;
+            }            
+        }
+        
         [HarmonyPatch(typeof(Pawn), "DeadConfirm", typeof(bool))]
         [HarmonyPrefix]
         public static void DeadConfirm(Pawn __instance, bool force)
@@ -390,7 +408,7 @@ namespace BepInPluginSample
                 return;
             }
             logger.LogWarning($"DeadConfirm ; {GameConfig.IsPlayerControlledPawn(__instance)} ; {__instance.Stat.HP} ; {__instance.Stat.MaxHP} ; {force}");
-            if (__instance.Stat.HP <= 0 && __instance.Stat.MaxHP > 0 && GameConfig.IsPlayerControlledPawn(__instance) && !force)
+            if (__instance.Stat.HP <= 0 && __instance.Stat.MaxHP > 0 && __instance.Faction==FactionType.Hero && !force)
             {
                 __instance.Stat.FillMaxHP();
             }            
@@ -426,8 +444,12 @@ namespace BepInPluginSample
         [HarmonyPrefix]
         public static void setBaseStat(Pawn p, PawnBaseConfig config)
         {
-
-            logger.LogWarning($"setBaseStat ;");
+            var __instance = p;
+            logger.LogWarning($"setBaseStat ; {p.name} ; {__instance.Stat.Energy} ; {__instance.Stat.MaxEnergy} ");
+            if (__instance.Stat.Energy < __instance.Stat.MaxEnergy && __instance.Faction == FactionType.Hero)
+            {
+                __instance.Stat.Energy = __instance.Stat.MaxEnergy;
+            }
         }
         
         //List<Pawn> pawns = new List<Pawn>();
