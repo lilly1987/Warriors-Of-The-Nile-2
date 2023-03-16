@@ -29,6 +29,7 @@ namespace BepInPluginSample
         private ConfigEntry<bool> isOpen;
         private ConfigEntry<float> uiW;
         private ConfigEntry<float> uiH;
+        
 
         public int windowId = 542;
         public Rect windowRect;
@@ -50,7 +51,12 @@ namespace BepInPluginSample
 
         private static ConfigEntry<bool> noDeadConfirm;
         private static ConfigEntry<bool> noEnergy;
+        private static ConfigEntry<bool> onRefreshCard;
         private static ConfigEntry<bool> isCurrencyEnough;
+        private static ConfigEntry<bool> randomRareTypeOn;
+        private static ConfigEntry<CardRareType> nCardRareType;
+        string[] sCardRareType;
+        int select;
         // private static ConfigEntry<float> uiW;
         // private static ConfigEntry<float> xpMulti;
 
@@ -100,6 +106,11 @@ namespace BepInPluginSample
             noDeadConfirm = Config.Bind("game", "noDeadConfirm", true);
             isCurrencyEnough = Config.Bind("game", "isCurrencyEnough", true);
             noEnergy = Config.Bind("game", "noEnergy", true);
+            onRefreshCard = Config.Bind("game", "onRefreshCard", true);
+            randomRareTypeOn = Config.Bind("game", "randomRareTypeOn", true);
+            nCardRareType = Config.Bind("game", "nCardRareType", CardRareType.God);
+            select= (int)nCardRareType.Value;
+            sCardRareType =Enum.GetNames(typeof(CardRareType));
             // xpMulti = Config.Bind("game", "xpMulti", 2f);
 
             // =========================================================
@@ -229,8 +240,16 @@ namespace BepInPluginSample
                 if (GUILayout.Button($"noDeadConfirm {noDeadConfirm.Value}")) { noDeadConfirm.Value = !noDeadConfirm.Value; }
                 if (GUILayout.Button($"noEnergy {noEnergy.Value}")) { noEnergy.Value = !noEnergy.Value; }
                 if (GUILayout.Button($"isCurrencyEnough {isCurrencyEnough.Value}")) { isCurrencyEnough.Value = !isCurrencyEnough.Value; }
+                if (GUILayout.Button($"onRefresh {onRefreshCard.Value}")) { onRefreshCard.Value = !onRefreshCard.Value; }
                 if (GUILayout.Button($"SilverCoin +10000")) { InventoryManager.AddCurrency(CurrencyType.SilverCoin, 10000);  }
                 if (GUILayout.Button($"PharaohCoin +100")) { InventoryManager.AddCurrency(CurrencyType.PharaohCoin, 100);  }
+
+                if (GUILayout.Button($"randomRareTypeOn {randomRareTypeOn.Value}")) { randomRareTypeOn.Value = !randomRareTypeOn.Value; }
+                select=GUILayout.SelectionGrid(select, sCardRareType,3);
+                if (GUI.changed)
+                {
+                    nCardRareType.Value = (CardRareType)select;
+                }
 
                 GUILayout.Label($"pawns ; {pawns.Count}");
                 foreach (var item in pawns)
@@ -450,6 +469,72 @@ namespace BepInPluginSample
             {
                 __instance.Stat.Energy = __instance.Stat.MaxEnergy;
             }
+        }
+                
+        [HarmonyPatch(typeof(CardChoicePanel), "InitFromSelectedPawn")]
+        [HarmonyPostfix]
+        public static void InitFromSelectedPawn(CardChoicePanel __instance, ref int ___refreshTimes)
+        {
+            logger.LogWarning($"InitFromSelectedPawn ; {___refreshTimes} ");
+            if (!onRefreshCard.Value)
+            {
+                return;
+            }
+            ___refreshTimes = -99;
+            __instance.RefreshButton.gameObject.SetActive(true);
+        }
+            
+        [HarmonyPatch(typeof(CardChoicePanel), "OnCampExitAnimStart")]
+        [HarmonyPrefix]
+        public static void OnCampExitAnimStart(CardChoicePanel __instance, ref int ___refreshTimes)
+        {
+            logger.LogWarning($"OnCampExitAnimStart ; {___refreshTimes} ");
+            if (!onRefreshCard.Value)
+            {
+                return;
+            }
+            ___refreshTimes = -99;
+            __instance.RefreshButton.gameObject.SetActive(true);
+        }
+        
+        [HarmonyPatch(typeof(CardChoicePanel), "LoadSaveState")]
+        [HarmonyPrefix]
+        public static void LoadSaveState(CardChoicePanel __instance, ref int ___refreshTimes)
+        {
+            logger.LogWarning($"LoadSaveState ; {___refreshTimes} ");
+            if (!onRefreshCard.Value)
+            {
+                return;
+            }
+            SaveDataManager.GetContinueData().GetBattleContinueData().RefreshCardTimes = -99;
+            ___refreshTimes = -99;
+            __instance.RefreshButton.gameObject.SetActive(true);
+        }
+        
+        [HarmonyPatch(typeof(CardChoicePanel), "refreshCard")]
+        [HarmonyPostfix]
+        public static void refreshCard(CardChoicePanel __instance, ref int ___refreshTimes)
+        {
+            logger.LogWarning($"refreshCard ; {___refreshTimes} ");
+            if (!onRefreshCard.Value)
+            {
+                return;
+            }
+            SaveDataManager.GetContinueData().GetBattleContinueData().RefreshCardTimes = -99;
+            ___refreshTimes = -99;
+            __instance.RefreshButton.gameObject.SetActive(true);
+        }
+        
+        [HarmonyPatch(typeof(CardSlotMachine), "randomRareType")]
+        [HarmonyPostfix]
+        public static void randomRareType(CardSlotMachine __instance, ref CardRareType __result)
+        {
+            logger.LogWarning($"randomRareType ; {__result} ");
+            if (!randomRareTypeOn.Value)
+            {
+                return;
+            }
+            __result = nCardRareType.Value;
         }
         
         //List<Pawn> pawns = new List<Pawn>();
