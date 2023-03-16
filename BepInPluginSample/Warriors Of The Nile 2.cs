@@ -536,6 +536,49 @@ namespace BepInPluginSample
             }
             __result = nCardRareType.Value;
         }
+
+        // public static CardRareType RandomRareTypeBy(Dictionary<CardRareType, int> RareRateMap, Dictionary<CardRareType, List<int>> RareLookupPool = null)
+        [HarmonyPatch(typeof(GameUtils), "RandomRareTypeBy", typeof(Dictionary<CardRareType, int>), typeof(Dictionary<CardRareType, List<int>>))]
+        [HarmonyPostfix]
+        public static void RandomRareTypeBy1( ref CardRareType __result, Dictionary<CardRareType, List<int>> RareLookupPool)//GameUtils __instance,
+        {
+            logger.LogWarning($"RandomRareTypeBy1 ; {__result} ");
+            if (!randomRareTypeOn.Value)
+            {
+                return;
+            }
+            for (int i = (int)nCardRareType.Value; i >= 0; i--)
+            {
+                if (RareLookupPool.ContainsKey((CardRareType)i) && RareLookupPool[(CardRareType)i].Count > 0)
+                {
+                    logger.LogWarning($"RandomRareTypeBy1 ; {__result} ; {RareLookupPool.ContainsKey((CardRareType)i)} ; {RareLookupPool[(CardRareType)i].Count}");
+                    __result = (CardRareType)i;
+                    return;
+                }
+            }
+        }
+
+        // public static CardRareType RandomRareTypeBy(Dictionary<Range, CardRareType> RareDistributionMap, Dictionary<CardRareType, List<int>> RareLookupPool = null)
+        [HarmonyPatch(typeof(GameUtils), "RandomRareTypeBy", typeof(Dictionary<Range, CardRareType>), typeof(Dictionary<CardRareType, List<int>>))]
+        [HarmonyPostfix]
+        public static void RandomRareTypeBy2( ref CardRareType __result, Dictionary<CardRareType, List<int>> RareLookupPool)//GameUtils __instance,
+        {
+            logger.LogWarning($"RandomRareTypeBy2 ; {__result} ; {RareLookupPool.ContainsKey(nCardRareType.Value)} ; {RareLookupPool[nCardRareType.Value].Count}");
+            if (!randomRareTypeOn.Value)
+            {
+                return;
+            }
+            for (int i = (int)nCardRareType.Value ; i >= 0; i--)
+            {
+                if (RareLookupPool.ContainsKey((CardRareType)i) && RareLookupPool[(CardRareType)i].Count > 0)
+                {
+                    logger.LogWarning($"RandomRareTypeBy2 ; {__result} ; {RareLookupPool.ContainsKey((CardRareType)i)} ; {RareLookupPool[(CardRareType)i].Count}");
+                    __result = (CardRareType)i;
+                    return;
+                }
+            }
+
+        }
         
         //List<Pawn> pawns = new List<Pawn>();
 
