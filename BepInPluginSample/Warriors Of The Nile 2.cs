@@ -537,6 +537,33 @@ namespace BepInPluginSample
             __result = nCardRareType.Value;
         }
 
+        /*
+        [HarmonyPatch(typeof(InscriptionRefreshButton), "SetActive")]
+        [HarmonyPrefix]
+        public static void SetActive(InscriptionRefreshButton __instance, ref bool active)
+        {
+            logger.LogWarning($"SetActive ; {active} ");
+            if (!onRefreshCard.Value)
+            {
+                return;
+            }
+            SaveDataManager.GetContinueData().GetShopContinueData().InscriptionRefreshedCount = -99;
+            active = true;
+        }
+        */
+        [HarmonyPatch(typeof(InscriptionRefreshButton), "SetCanRefresh")]
+        [HarmonyPrefix]
+        public static void SetCanRefresh(InscriptionRefreshButton __instance, ref bool canRefresh)
+        {
+            logger.LogWarning($"SetCanRefresh ; {canRefresh} ");
+            if (!onRefreshCard.Value)
+            {
+                return;
+            }
+            SaveDataManager.GetContinueData().GetShopContinueData().InscriptionRefreshedCount = -99;
+            canRefresh = true;
+        }
+
         // public static CardRareType RandomRareTypeBy(Dictionary<CardRareType, int> RareRateMap, Dictionary<CardRareType, List<int>> RareLookupPool = null)
         [HarmonyPatch(typeof(GameUtils), "RandomRareTypeBy", typeof(Dictionary<CardRareType, int>), typeof(Dictionary<CardRareType, List<int>>))]
         [HarmonyPostfix]
